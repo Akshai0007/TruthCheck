@@ -1,0 +1,6 @@
+{"claim": "Marie Curie was born in Warsaw.", "label": "SUPPORTS"}
+{"claim": "Marie Curie won the Nobel Prize in Chemistry in 1911.", "label": "SUPPORTS"}
+{"claim": "Penicillin was discovered by Alexander Fleming.", "label": "SUPPORTS"}
+{"claim": "Marie Curie discovered penicillin.", "label": "REFUTES"}
+{"claim": "The Eiffel Tower is in Berlin.", "label": "REFUTES"}
+{"claim": "Marie Curie played the violin.", "label": "NOT ENOUGH INFO"}
