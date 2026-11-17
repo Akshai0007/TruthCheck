@@ -70,13 +70,15 @@ def main(argv=None):
     ap.add_argument("path"); ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--provider"); ap.add_argument("--model")
     ap.add_argument("--docs"); ap.add_argument("--wikipedia", action="store_true")
+    ap.add_argument("--max-search-steps", type=int, default=2,
+                    help="1 = no second search, 2 = one retry (default)")
     a = ap.parse_args(argv)
     try:
         llm = make_llm(a.provider, a.model)
     except ValueError as e:
         sys.exit(f"Setup problem: {e}")
     retr = LocalDocsRetriever.from_folder(a.docs) if a.docs else WikipediaRetriever()
-    print(json.dumps(run(load(a.path, a.limit), TruthCheck(llm, retr)), indent=2))
+    print(json.dumps(run(load(a.path, a.limit), TruthCheck(llm, retr, max_search_steps=a.max_search_steps)), indent=2))
 
 
 if __name__ == "__main__":

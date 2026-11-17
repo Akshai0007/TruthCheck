@@ -1,2 +1,10 @@
 __pycache__/
+*.pyc
 .pytest_cache/
+.venv/
+venv/
+.env
+.streamlit/secrets.toml
+truthcheck_report.json
+shared_task_*.jsonl
+.DS_Store

@@ -2,13 +2,15 @@
 
 A fact-checking agent for AI answers. It reads an answer, pulls out each factual claim, looks for evidence, labels every claim **Supported / Contradicted / Unverified**, and rewrites the answer using only what the evidence backs.
 
+Full project proposal: [docs/TruthCheck_Project_Proposal.docx](docs/TruthCheck_Project_Proposal.docx)
+
 ## Try it in 30 seconds (no API key)
 
 ```bash
 pip install -r requirements.txt
 python -m truthcheck.cli --demo          # command line
 streamlit run app.py                     # web app: choose "Demo" in the sidebar
-python -m pytest -q                      # 39 tests
+python -m pytest -q                      # 40 tests (optional UI/PDF tests may be skipped)
 ```
 
 Demo mode is a script that only understands one built-in example. It shows the real pipeline, not real fact-checking.
@@ -69,6 +71,25 @@ python -m eval.evaluate my_claims.jsonl --provider groq --model <name> --wikiped
 
 It prints accuracy, per-label precision / recall / F1, and a confusion matrix.
 
+### Getting FEVER claims
+
+Download the labelled dev file from [fever.ai](https://fever.ai) (the shared-task `.jsonl`; check the exact file name on the site), then:
+
+```bash
+python -m eval.make_fever_sample shared_task_dev.jsonl eval/fever_150.jsonl --per-label 50
+```
+
+This writes a balanced sample (50 SUPPORTS, 50 REFUTES, 50 NOT ENOUGH INFO) in the format `evaluate.py` expects.
+
+### Does the second search help?
+
+Run the same claims twice and compare the two result tables:
+
+```bash
+python -m eval.evaluate eval/fever_150.jsonl --provider groq --model <n> --wikipedia --max-search-steps 1   # no retry
+python -m eval.evaluate eval/fever_150.jsonl --provider groq --model <n> --wikipedia --max-search-steps 2   # default
+```
+
 ## Cost and speed
 
 One check of an answer with N claims makes about **N + 2 model calls** (1 extract, N verify, 1 correct), up to 2N + 1 if the judge asks for a second search. `--samples K` adds about 2K more. Free tiers have rate limits: lower `workers` in `TruthCheck(...)` if you hit them. Rate-limit replies are retried automatically, wrong keys fail immediately with the provider's message.
@@ -77,7 +98,7 @@ One check of an answer with N claims makes about **N + 2 model calls** (1 extrac
 
 | | Status |
 |---|---|
-| Pipeline logic, safety guards, scoring, correction | Tested (39 tests; a deliberate break of the evidence guard was caught) |
+| Pipeline logic, safety guards, scoring, correction | Tested (40 tests; a deliberate break of the evidence guard was caught) |
 | Real HTTP code for Anthropic-style, OpenAI-style and Wikipedia-style APIs | Tested against local fake servers: headers, JSON shapes, retries on 429, fast failure on bad keys, unreachable server |
 | Random garbage from the model (150 fuzz runs) | Never crashes; always returns a report |
 | Non-English text, PDFs, abbreviations like "Dr." | Tested after bugs were found and fixed |
@@ -104,5 +125,7 @@ truthcheck/prompts.py     every instruction given to the model
 truthcheck/demo.py        offline scripted demo
 app.py                    web interface
 eval/evaluate.py          accuracy measurement
-tests/                    39 tests (unit, HTTP-level, fuzz, CLI, UI)
+eval/make_fever_sample.py turn a FEVER download into our claims file
+docs/                     the project proposal
+tests/                    40 tests (unit, HTTP-level, fuzz, CLI, UI)
 ```
