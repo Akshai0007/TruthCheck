@@ -1,12 +1,13 @@
 """Web interface:  streamlit run app.py"""
 import html
 import json
+import os
 
 import streamlit as st
 
 from truthcheck import LocalDocsRetriever, TruthCheck, WikipediaRetriever
 from truthcheck.demo import DEMO_ANSWER, DEMO_DOCS, DEMO_QUESTION
-from truthcheck.llm import make_llm
+from truthcheck.llm import KEY_ENV, find_api_key, make_llm, models_for
 from truthcheck.retrieval import text_from_file
 
 st.set_page_config(page_title="TruthCheck", page_icon="🔎", layout="wide")
@@ -41,15 +42,22 @@ def highlighted(answer, claims):
 # ---------------- sidebar: settings ----------------
 with st.sidebar:
     st.header("Settings")
-    provider = st.selectbox("Language model", ["Demo (offline, sample only)", "Anthropic", "Groq",
-                                               "Gemini", "Ollama (local)", "OpenAI"])
-    key = provider.split(" ")[0].lower()
+    PROVIDERS = {"Groq": "groq", "OpenAI": "openai", "Gemini": "gemini"}
+    options = list(PROVIDERS) + ["Demo (offline, sample only)"]
+    preferred = os.getenv("TRUTHCHECK_PROVIDER", "").lower().strip()
+    start = next((i for i, o in enumerate(options) if PROVIDERS.get(o, "demo") == preferred), None)
+    if start is None:   # no valid default: first provider that has a key, else the offline demo
+        start = next((i for i, o in enumerate(options) if PROVIDERS.get(o) and find_api_key(PROVIDERS[o])),
+                     len(options) - 1)
+    provider = st.selectbox("Language model", options, index=start)
+    key = PROVIDERS.get(provider, "demo")
     if key == "demo":
         st.info("Demo mode is a script, not real checking. It only understands the built-in example.")
-        api_key, model = "", ""
+    elif not find_api_key(key):
+        st.error(f"No API key found. Add {KEY_ENV[key][0]}=... to your .env file and restart the app.")
     else:
-        model = st.text_input("Model name", help="Copy the exact name from your provider's docs.")
-        api_key = "" if key == "ollama" else st.text_input("API key", type="password")
+        st.caption("Models are picked automatically; if one is busy the next is tried: "
+                   + " > ".join(models_for(key)))
     source = "Demo documents" if key == "demo" else st.radio("Where to look for evidence",
                                                              ["Wikipedia", "My own documents"])
     files = st.file_uploader("Upload .txt, .md or .pdf files", type=["txt", "md", "pdf"],
@@ -72,7 +80,7 @@ question = st.text_input("What was it answering? (optional)") if mode.startswith
 
 if st.button("Check", type="primary", disabled=not text.strip()):
     try:
-        llm = make_llm("demo") if key == "demo" else make_llm(key, model or None, api_key or None)
+        llm = make_llm(key)
         if key == "demo":
             retriever = LocalDocsRetriever(DEMO_DOCS)
         elif source == "Wikipedia":
@@ -90,9 +98,13 @@ if st.button("Check", type="primary", disabled=not text.strip()):
         st.error(f"Could not run the check: {e}")
         st.stop()
     st.session_state["report"] = rep
+    st.session_state["models_used"] = getattr(getattr(llm, "inner", None), "usage", None) or {}
 
 rep = st.session_state.get("report")
 if rep:
+    used = st.session_state.get("models_used")
+    if used:
+        st.caption("Answered by: " + ", ".join(f"{m} ({n} calls)" for m, n in used.items()))
     for n in rep.notes:
         st.warning(n)
     if rep.claims:

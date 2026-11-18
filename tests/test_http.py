@@ -140,6 +140,7 @@ def test_setup_errors_are_explained():
         make_llm("")
     with pytest.raises(ValueError, match="API key"):
         make_llm("groq", "m", "")
-    with pytest.raises(ValueError, match="No model"):
-        make_llm("groq", None, "k")
+    with pytest.raises(ValueError, match="No models known"):
+        make_llm("openrouter", None, "k")           # no built-in list: needs --model or OPENROUTER_MODELS
+    assert make_llm("groq", None, "k")              # no model needed: the automatic list is used
     assert make_llm("ollama", None, "")  # local models need neither key nor explicit model

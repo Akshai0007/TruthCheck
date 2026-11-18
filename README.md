@@ -22,7 +22,8 @@ Pick any provider. Groq and Gemini have free tiers; Ollama runs models on your o
 ```bash
 export TRUTHCHECK_PROVIDER=groq          # anthropic | openai | groq | gemini | ollama | openrouter
 export TRUTHCHECK_MODEL=<model name>
-export TRUTHCHECK_API_KEY=<your key>     # not needed for ollama
+# Save the selected provider's key in .env as GROQ_API_KEY, OPENAI_API_KEY or GEMINI_API_KEY.
+# TRUTHCHECK_API_KEY is also supported as a fallback; not needed for ollama.
 
 python -m truthcheck.cli --wikipedia "Marie Curie was born in Paris and won two Nobel Prizes."
 python -m truthcheck.cli --docs ./my_faq_folder   # .txt, .md or .pdf files

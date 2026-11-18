@@ -78,7 +78,9 @@ def main(argv=None):
     except ValueError as e:
         sys.exit(f"Setup problem: {e}")
     retr = LocalDocsRetriever.from_folder(a.docs) if a.docs else WikipediaRetriever()
-    print(json.dumps(run(load(a.path, a.limit), TruthCheck(llm, retr, max_search_steps=a.max_search_steps)), indent=2))
+    result = run(load(a.path, a.limit), TruthCheck(llm, retr, max_search_steps=a.max_search_steps))
+    result["models_used"] = getattr(getattr(llm, "inner", None), "usage", None)   # which models answered
+    print(json.dumps(result, indent=2))
 
 
 if __name__ == "__main__":
