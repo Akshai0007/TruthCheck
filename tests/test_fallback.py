@@ -81,3 +81,20 @@ def test_openai_payload_uses_new_style_fields(monkeypatch):
     assert sent["max_completion_tokens"] == 99 and "temperature" not in sent and "max_tokens" not in sent
     L.OpenAICompatLLM("m", "k", "https://api.groq.com/openai/v1").complete("s", "u", 0.0, 99)
     assert sent["max_tokens"] == 99 and sent["temperature"] == 0.0
+
+
+def test_wikipedia_retries_when_rate_limited(monkeypatch):
+    from truthcheck.retrieval import WikipediaRetriever
+    monkeypatch.setattr("truthcheck.retrieval.time.sleep", lambda s: None)
+    codes = iter([429, 429, 200])
+
+    class R:
+        def __init__(self, code): self.status_code, self.headers = code, {}
+        def raise_for_status(self): pass
+        def json(self): return {"query": {"search": []}}
+
+    class S:
+        headers = {}
+        def get(self, *a, **k): return R(next(codes))
+
+    assert WikipediaRetriever(session=S()).search("x") == []   # 3rd try succeeds, no error raised

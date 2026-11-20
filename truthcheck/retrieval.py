@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import math
 import re
+import threading
+import time
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass
@@ -156,7 +158,7 @@ class WikipediaRetriever:
     """Search Wikipedia, download the top pages, keep the best-matching passages."""
 
     def __init__(self, n_pages: int = 3, lang: str = "en", session=None, timeout: int = 15,
-                 api_url: Optional[str] = None):
+                 api_url: Optional[str] = None, retries: int = 4, min_interval: float = 0.25):
         self.api = api_url or f"https://{lang}.wikipedia.org/w/api.php"
         self.wiki = f"https://{lang}.wikipedia.org/wiki/"
         self.n_pages, self.timeout = n_pages, timeout
@@ -164,12 +166,36 @@ class WikipediaRetriever:
         self.session.headers.update(
             {"User-Agent": "truthcheck-student-project/0.1 (educational fact-checking demo)"})
         self._pages = {}
+        self.retries, self.min_interval = retries, min_interval
+        self._lock, self._last = threading.Lock(), 0.0
 
     def _get(self, params: dict) -> dict:
-        r = self.session.get(self.api, params={**params, "format": "json", "formatversion": 2},
-                             timeout=self.timeout)
-        r.raise_for_status()
-        return r.json()
+        """One request at a time, slightly spaced out, retried when Wikipedia says 'too many requests'."""
+        last = "no attempt made"
+        for attempt in range(self.retries):
+            r = None
+            with self._lock:   # claims are checked in parallel; Wikipedia rate-limits bursts
+                gap = self.min_interval - (time.time() - self._last)
+                if gap > 0:
+                    time.sleep(gap)
+                try:
+                    r = self.session.get(self.api, params={**params, "format": "json", "formatversion": 2},
+                                         timeout=self.timeout)
+                except (requests.ConnectionError, requests.Timeout) as e:
+                    last = str(e)
+                self._last = time.time()
+            if r is None:
+                time.sleep(2 ** attempt)
+                continue
+            code = getattr(r, "status_code", 200)
+            if code in (429, 500, 502, 503, 504):
+                last = f"HTTP {code}"
+                wait = str(getattr(r, "headers", {}).get("Retry-After", ""))
+                time.sleep(min(float(wait), 20) if wait.replace(".", "", 1).isdigit() else 2 ** attempt)
+                continue
+            r.raise_for_status()
+            return r.json()
+        raise RuntimeError(f"Wikipedia request failed after {self.retries} tries: {last}")
 
     def _page_passages(self, title: str) -> list:
         if title not in self._pages:

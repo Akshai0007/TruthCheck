@@ -129,7 +129,8 @@ def test_cli_setup_error_is_friendly_not_a_traceback():
 def test_eval_cli_runs_and_counts_checker_errors(tmp_path):
     for name, text in DEMO_DOCS.items():
         (tmp_path / f"{name}.txt").write_text(text)
-    out = _run("eval.evaluate", "eval/sample_claims.jsonl", "--provider", "demo", "--docs", str(tmp_path))
+    out = _run("eval.evaluate", "eval/sample_claims.jsonl", "--provider", "demo", "--docs", str(tmp_path),
+                "--out", str(tmp_path / "r.jsonl"))
     assert out.returncode == 0, out.stderr
     res = json.loads(out.stdout)
     assert res["n"] == 6 and "accuracy" in res and res["checker_errors"] >= 1  # demo model can't judge unseen claims
